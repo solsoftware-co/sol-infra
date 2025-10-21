@@ -45,7 +45,7 @@ remote_state {
   }
   
   config = {
-    bucket   = "sol-terraform-state-${get_env("TF_VAR_project_id", "sol-infra")}"
+    bucket   = "${get_env("TF_VAR_project_id", "sol-infra")}-tfstate"
     prefix   = "${local.env}/${local.service_name}"
     project  = get_env("TF_VAR_project_id", "sol-infra")
     location = "us"
