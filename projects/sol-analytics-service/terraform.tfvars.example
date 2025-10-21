@@ -1,0 +1,46 @@
+# Example terraform.tfvars for sol-analytics-service
+# Copy this to terraform.tfvars and fill in your values
+# IMPORTANT: Never commit terraform.tfvars with sensitive data!
+
+project_id     = "your-gcp-project-id"
+project_number = "your-project-number"
+region         = "us-central1"
+function_name  = "sol-analytics-service"
+
+# Service accounts that can publish to the topic
+publisher_sas = [
+  # "example-sa@your-project.iam.gserviceaccount.com"
+]
+
+# Service accounts that can read from artifacts bucket
+artifact_reader_sas = [
+  # "example-sa@your-project.iam.gserviceaccount.com"
+]
+
+# Additional environment variables
+env_vars = {
+  DEBUG     = "false"
+  LOG_LEVEL = "info"
+}
+
+# Secret environment variables (reference secrets in Secret Manager)
+secret_env_vars = {
+  # ANALYTICS_API_KEY = {
+  #   secret  = "analytics-api-key"
+  #   version = "latest"
+  # }
+}
+
+# Secret Manager IAM bindings
+secret_bindings = [
+  # {
+  #   project_id = "your-project-id"
+  #   secret_id  = "analytics-api-key"
+  #   role       = "roles/secretmanager.secretAccessor"
+  #   members    = ["serviceAccount:sol-analytics-service-sa@your-project.iam.gserviceaccount.com"]
+  # }
+]
+
+# Function source configuration
+source_zip_path    = "../../../function-source.zip"
+source_object_name = "function-source.zip"

@@ -1,0 +1,162 @@
+locals {
+  env              = "test"
+  app              = var.function_name
+  deployer_sa_email = "tf-deployer@${var.project_id}.iam.gserviceaccount.com"
+  topic_name        = "${var.function_name}-topic"
+  artifacts_bucket_name = "${var.project_id}-${var.function_name}-artifacts-test"
+  
+  # Service accounts
+  cloud_build_sa     = "${var.project_number}@cloudbuild.gserviceaccount.com"
+  compute_default_sa = "${var.project_number}-compute@developer.gserviceaccount.com"
+  
+  # Labels
+  labels = {
+    app        = local.app
+    env        = local.env
+    managed_by = "terraform"
+  }
+}
+
+# Enable required GCP services
+module "services" {
+  source     = "../../../modules/project_services"
+  project_id = var.project_id
+  services = [
+    "analyticsdata.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "run.googleapis.com",
+    "eventarc.googleapis.com",
+    "pubsub.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "logging.googleapis.com",
+    "secretmanager.googleapis.com",
+    "storage.googleapis.com",
+  ]
+}
+
+# Runtime service account
+module "runtime_sa" {
+  source            = "../../../modules/service_account"
+  project_id        = var.project_id
+  account_id        = "${var.function_name}-sa-test"
+  display_name      = "SA for ${var.function_name} (${local.env})"
+  deployer_sa_email = local.deployer_sa_email
+  
+  depends_on = [module.services]
+}
+
+# IAM bindings
+module "iam" {
+  source     = "../../../modules/iam_bindings"
+  project_id = var.project_id
+  region     = var.region
+
+  project_roles = {
+    "roles/run.admin"               = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/eventarc.admin"          = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/iam.serviceAccountAdmin" = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/logging.admin"           = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/artifactregistry.writer" = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/logging.logWriter"       = ["serviceAccount:${module.runtime_sa.email}", "serviceAccount:${local.cloud_build_sa}"]
+    "roles/artifactregistry.writer" = ["serviceAccount:${local.cloud_build_sa}"]
+  }
+
+  sa_act_as = {
+    (module.runtime_sa.email) = ["serviceAccount:${local.deployer_sa_email}"]
+  }
+
+  secret_bindings = var.secret_bindings
+
+  depends_on = [module.services, module.runtime_sa]
+}
+
+# Pub/Sub topic for analytics events
+module "topic" {
+  source        = "../../../modules/pubsub_topic"
+  name          = local.topic_name
+  labels        = local.labels
+  publisher_sas = var.publisher_sas
+  
+  depends_on = [module.services]
+}
+
+# Artifacts bucket (for processed analytics data)
+module "artifacts_bucket" {
+  source              = "../../../modules/gcs_bucket"
+  name                = local.artifacts_bucket_name
+  location            = var.region
+  force_destroy       = true
+  labels              = local.labels
+  lifecycle_days_delete = 7  # Shorter retention for test
+  iam_writers         = [module.runtime_sa.email]
+  iam_readers         = concat([module.runtime_sa.email], tolist(var.artifact_reader_sas))
+  iam_deleters        = [module.runtime_sa.email]
+  
+  depends_on = [module.services]
+}
+
+# Source bucket for function code
+module "source_bucket" {
+  source        = "../../../modules/gcs_bucket"
+  name          = "${var.project_id}-${var.function_name}-gcf-src-test"
+  location      = var.region
+  force_destroy = true
+  labels        = local.labels
+  
+  depends_on = [module.services]
+}
+
+# Function source upload (assumes zip exists at specified path)
+module "function_source" {
+  source      = "../../../modules/function_source"
+  bucket_name = module.source_bucket.name
+  object_name = var.source_object_name
+  source_path = var.source_zip_path
+}
+
+# Cloud Function
+module "function" {
+  source                = "../../../modules/gcf2_function"
+  name                  = "${var.function_name}-test"
+  region                = var.region
+  project_id            = var.project_id
+  service_account_email = module.runtime_sa.email
+  topic_id              = module.topic.id
+  source_bucket         = module.function_source.bucket
+  source_object         = module.function_source.object
+  entry_point           = "analyticsHandler"
+  runtime               = "nodejs22"
+  available_memory      = "256M"  # Lower resources for test
+  timeout_seconds       = 540
+  min_instance_count    = 0
+  max_instance_count    = 1  # Lower max instances for test
+  labels                = local.labels
+
+  env_vars = merge(
+    {
+      NODE_ENV         = "test"
+      BUCKET_ARTIFACTS = local.artifacts_bucket_name
+    },
+    var.env_vars
+  )
+
+  secret_env_vars = var.secret_env_vars
+
+  depends_on = [
+    module.services,
+    module.function_source,
+    module.iam
+  ]
+}
+
+# Allow compute SA to invoke the function
+resource "google_cloud_run_v2_service_iam_member" "trigger_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = "${var.function_name}-test"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${local.compute_default_sa}"
+  
+  depends_on = [module.function]
+}

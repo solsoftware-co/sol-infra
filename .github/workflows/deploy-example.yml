@@ -1,0 +1,96 @@
+# Example GitHub Actions workflow for deploying infrastructure
+# Copy this to your service repository and adapt as needed
+
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy'
+        required: true
+        type: choice
+        options:
+          - sol-email-service
+          - sol-analytics-service
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+
+env:
+  TF_VERSION: '1.5.0'
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.service }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    
+    # Use GitHub environments for approval gates
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          path: service
+      
+      - name: Checkout sol-infra repository
+        uses: actions/checkout@v4
+        with:
+          repository: sol-software/sol-infra
+          token: ${{ secrets.GH_PAT }}
+          path: sol-infra
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Build function source
+        run: |
+          cd service/function-source
+          zip -r ../../function.zip .
+          echo "Function zip created: $(ls -lh ../../function.zip)"
+      
+      - name: Initialize Terraform
+        working-directory: sol-infra/projects/${{ inputs.service }}/${{ inputs.environment }}
+        run: terraform init
+      
+      - name: Validate Terraform
+        working-directory: sol-infra/projects/${{ inputs.service }}/${{ inputs.environment }}
+        run: terraform validate
+      
+      - name: Plan Terraform
+        working-directory: sol-infra/projects/${{ inputs.service }}/${{ inputs.environment }}
+        run: |
+          terraform plan \
+            -var="source_zip_path=../../../../function.zip" \
+            -var="source_object_name=function-${{ github.sha }}.zip" \
+            -out=tfplan
+      
+      - name: Apply Terraform
+        working-directory: sol-infra/projects/${{ inputs.service }}/${{ inputs.environment }}
+        run: terraform apply -auto-approve tfplan
+      
+      - name: Show outputs
+        working-directory: sol-infra/projects/${{ inputs.service }}/${{ inputs.environment }}
+        run: terraform output
+      
+      - name: Verify deployment
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Service: ${{ inputs.service }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Git SHA: ${{ github.sha }}"

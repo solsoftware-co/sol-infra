@@ -1,0 +1,130 @@
+# Sol Infrastructure Makefile (Terragrunt Version)
+# Provides convenient commands for Terragrunt operations
+
+.PHONY: help init plan apply destroy fmt validate clean run-all
+
+# Default target
+help:
+	@echo "Sol Infrastructure Management (Terragrunt)"
+	@echo ""
+	@echo "Single Service Commands:"
+	@echo "  make init SERVICE=sol-email-service ENV=test    - Initialize Terragrunt"
+	@echo "  make plan SERVICE=sol-email-service ENV=test    - Show execution plan"
+	@echo "  make apply SERVICE=sol-email-service ENV=test   - Apply configuration"
+	@echo "  make destroy SERVICE=sol-email-service ENV=test - Destroy infrastructure"
+	@echo "  make output SERVICE=sol-email-service ENV=test  - Show outputs"
+	@echo ""
+	@echo "Multi-Service Commands:"
+	@echo "  make run-all-plan ENV=test                      - Plan all services in env"
+	@echo "  make run-all-apply ENV=test                     - Apply all services in env"
+	@echo "  make run-all-output ENV=test                    - Show outputs for all services"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  make fmt                                         - Format all .hcl files"
+	@echo "  make validate SERVICE=sol-email-service ENV=test - Validate configuration"
+	@echo "  make clean                                       - Remove .terragrunt-cache"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make apply SERVICE=sol-email-service ENV=prod"
+	@echo "  make run-all-plan ENV=test"
+	@echo ""
+
+# Validate required variables for single service commands
+check-vars:
+ifndef SERVICE
+	$(error SERVICE is not set. Use: make <target> SERVICE=sol-email-service ENV=test)
+endif
+ifndef ENV
+	$(error ENV is not set. Use: make <target> SERVICE=sol-email-service ENV=test)
+endif
+
+# Validate ENV for multi-service commands
+check-env:
+ifndef ENV
+	$(error ENV is not set. Use: make <target> ENV=test)
+endif
+
+# Initialize Terragrunt
+init: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt init
+
+# Show execution plan
+plan: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt plan
+
+# Apply configuration
+apply: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt apply
+
+# Destroy infrastructure
+destroy: check-vars
+	@echo "WARNING: This will destroy $(SERVICE) in $(ENV)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		cd live/$(ENV)/$(SERVICE) && terragrunt destroy; \
+	fi
+
+# Show outputs
+output: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt output
+
+# Validate configuration
+validate: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt validate
+
+# Format all Terragrunt and Terraform files
+fmt:
+	terragrunt hclfmt
+	terraform fmt -recursive .
+
+# Plan all services in environment
+run-all-plan: check-env
+	cd live/$(ENV) && terragrunt run-all plan
+
+# Apply all services in environment
+run-all-apply: check-env
+	@echo "WARNING: This will apply ALL services in $(ENV)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		cd live/$(ENV) && terragrunt run-all apply; \
+	fi
+
+# Show outputs for all services in environment
+run-all-output: check-env
+	cd live/$(ENV) && terragrunt run-all output
+
+# Destroy all services in environment
+run-all-destroy: check-env
+	@echo "WARNING: This will destroy ALL services in $(ENV)"
+	@read -p "Are you absolutely sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		cd live/$(ENV) && terragrunt run-all destroy; \
+	fi
+
+# Clean up .terragrunt-cache directories
+clean:
+	find . -type d -name ".terragrunt-cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
+	@echo "Cleaned up Terragrunt and Terraform cache directories"
+
+# Refresh state
+refresh: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt refresh
+
+# Show specific resource
+show: check-vars
+ifndef RESOURCE
+	$(error RESOURCE is not set. Use: make show SERVICE=... ENV=... RESOURCE=module.function.google_cloudfunctions2_function.this)
+endif
+	cd live/$(ENV)/$(SERVICE) && terragrunt state show $(RESOURCE)
+
+# List all resources
+list: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt state list
+
+# Graph dependencies
+graph: check-vars
+	cd live/$(ENV)/$(SERVICE) && terragrunt graph-dependencies

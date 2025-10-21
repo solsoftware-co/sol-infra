@@ -1,0 +1,80 @@
+# Terraform validation and formatting checks
+# Runs on pull requests to ensure code quality
+
+name: Terraform Checks
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '.github/workflows/terraform-checks.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '**.tf'
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service:
+          - sol-email-service
+          - sol-analytics-service
+        environment:
+          - test
+          - prod
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+      
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+      
+      - name: Terraform Init
+        working-directory: projects/${{ matrix.service }}/${{ matrix.environment }}
+        run: terraform init -backend=false
+      
+      - name: Terraform Validate
+        working-directory: projects/${{ matrix.service }}/${{ matrix.environment }}
+        run: terraform validate
+  
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+      
+      - name: Run TFLint
+        run: tflint --recursive --format compact
+  
+  docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Render terraform docs
+        uses: terraform-docs/gh-actions@v1
+        with:
+          working-dir: modules
+          output-file: README.md
+          output-method: inject
+          git-push: false

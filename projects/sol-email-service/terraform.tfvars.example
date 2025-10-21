@@ -1,0 +1,26 @@
+# Example terraform.tfvars for sol-email-service
+# Copy this to terraform.tfvars and fill in your values
+# IMPORTANT: Never commit terraform.tfvars with sensitive data!
+
+project_id     = "your-gcp-project-id"
+project_number = "your-project-number"
+region         = "us-central1"
+function_name  = "sol-email-service"
+
+# Service accounts that can publish to the topic
+publisher_sas = [
+  # "example-sa@your-project.iam.gserviceaccount.com"
+]
+
+# Additional environment variables
+env_vars = {
+  DEBUG     = "false"
+  LOG_LEVEL = "info"
+}
+
+# Mailgun API key (sensitive - use environment variable instead)
+# mailgun_api_key = "your-mailgun-api-key"
+
+# Function source configuration
+source_zip_path    = "../../../function-source.zip"
+source_object_name = "function-source.zip"
