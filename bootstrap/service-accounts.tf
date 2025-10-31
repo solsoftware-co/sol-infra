@@ -52,3 +52,10 @@ resource "google_project_iam_member" "tf_deployer_pubsub_admin" {
   role    = "roles/pubsub.admin"
   member  = "serviceAccount:${google_service_account.tf_deployer.email}"
 }
+
+# Project IAM Admin - Required to manage IAM policies on the project
+resource "google_project_iam_member" "tf_deployer_project_iam_admin" {
+  project = var.project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = "serviceAccount:${google_service_account.tf_deployer.email}"
+}
