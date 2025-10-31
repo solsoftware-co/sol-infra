@@ -1,0 +1,3 @@
+project_id             = "sol-infra-test"
+environment            = "test"
+state_bucket_location  = "us"
