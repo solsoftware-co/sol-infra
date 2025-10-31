@@ -38,3 +38,17 @@ resource "google_project_iam_member" "tf_deployer_service_usage_admin" {
   role    = "roles/serviceusage.serviceUsageAdmin"
   member  = "serviceAccount:${google_service_account.tf_deployer.email}"
 }
+
+# Service Account Admin - Required to manage service accounts for Cloud Functions
+resource "google_project_iam_member" "tf_deployer_sa_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.tf_deployer.email}"
+}
+
+# Pub/Sub Admin - Required for managing Pub/Sub topics and subscriptions
+resource "google_project_iam_member" "tf_deployer_pubsub_admin" {
+  project = var.project_id
+  role    = "roles/pubsub.admin"
+  member  = "serviceAccount:${google_service_account.tf_deployer.email}"
+}
