@@ -1,3 +1,4 @@
 project_id             = "sol-infra-prod"
+project_number         = "YOUR_PROD_PROJECT_NUMBER"
 environment            = "prod"
 state_bucket_location  = "us"

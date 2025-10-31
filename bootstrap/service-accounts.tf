@@ -59,3 +59,20 @@ resource "google_project_iam_member" "tf_deployer_project_iam_admin" {
   role    = "roles/resourcemanager.projectIamAdmin"
   member  = "serviceAccount:${google_service_account.tf_deployer.email}"
 }
+
+# Cloud Build service account permissions
+# Note: Cloud Build SA is auto-created by GCP with format: PROJECT_NUMBER@cloudbuild.gserviceaccount.com
+
+# Storage Object Viewer - Required for Cloud Build to read from GCS
+resource "google_project_iam_member" "cloud_build_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
+}
+
+# Storage Object Creator - Required for Cloud Build to write to GCS
+resource "google_project_iam_member" "cloud_build_storage_creator" {
+  project = var.project_id
+  role    = "roles/storage.objectCreator"
+  member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
+}

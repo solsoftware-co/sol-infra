@@ -1,3 +1,4 @@
 project_id             = "sol-infra-test"
+project_number         = "807699102325"
 environment            = "test"
 state_bucket_location  = "us"
