@@ -76,3 +76,35 @@ resource "google_project_iam_member" "cloud_build_storage_creator" {
   role    = "roles/storage.objectCreator"
   member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
 }
+
+# Compute Engine default service account permissions
+# Note: Used by Cloud Functions build process when no explicit build SA is specified
+# Format: PROJECT_NUMBER-compute@developer.gserviceaccount.com
+
+# Storage Object Viewer - Required to read function source code from GCS
+resource "google_project_iam_member" "compute_sa_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+}
+
+# Artifact Registry Writer - Required to push function container images
+resource "google_project_iam_member" "compute_sa_artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+}
+
+# Cloud Build Builder - Required to execute Cloud Build operations
+resource "google_project_iam_member" "compute_sa_cloudbuild_builder" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.builder"
+  member  = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+}
+
+# Logging Log Writer - Required to write build logs
+resource "google_project_iam_member" "compute_sa_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+}
