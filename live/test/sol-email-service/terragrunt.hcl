@@ -13,8 +13,9 @@ include "env" {
 }
 
 # Point to the service module (DRY!)
+# Use source map to include both service-modules and modules directories
 terraform {
-  source = "../../../service-modules/sol-email-service"
+  source = "${get_repo_root()}//service-modules/sol-email-service"
 }
 
 # Environment-specific inputs
