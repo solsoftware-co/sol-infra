@@ -27,6 +27,8 @@ override.tf.json
 Thumbs.db
 
 # Sensitive files
-secrets/
+# Note: modules/secrets/ should NOT be ignored - it's Terraform code
+# Only ignore actual secret files
 *.key
 *.pem
+*.secret
