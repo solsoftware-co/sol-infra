@@ -67,7 +67,7 @@ module "source_bucket" {
   depends_on = [module.services]
 }
 
-# IAM bindings
+# IAM bindings (static only - no runtime SA references)
 module "iam" {
   source     = "../../modules/iam_bindings"
   project_id = var.project_id
@@ -76,17 +76,15 @@ module "iam" {
   project_roles = {
     "roles/run.admin"               = ["serviceAccount:${local.deployer_sa_email}"]
     "roles/eventarc.admin"          = ["serviceAccount:${local.deployer_sa_email}"]
+    "roles/iam.serviceAccountAdmin" = ["serviceAccount:${local.deployer_sa_email}"]
     "roles/logging.admin"           = ["serviceAccount:${local.deployer_sa_email}"]
-    "roles/artifactregistry.writer" = ["serviceAccount:${local.deployer_sa_email}"]
-    "roles/logging.logWriter"       = ["serviceAccount:${module.runtime_sa.email}", "serviceAccount:${local.cloud_build_sa}"]
-    "roles/artifactregistry.writer" = ["serviceAccount:${local.cloud_build_sa}"]
+    "roles/artifactregistry.writer" = ["serviceAccount:${local.deployer_sa_email}", "serviceAccount:${local.cloud_build_sa}"]
+    "roles/logging.logWriter"       = ["serviceAccount:${local.cloud_build_sa}"]
   }
 
-  sa_act_as = {
-    (module.runtime_sa.email) = ["serviceAccount:${local.deployer_sa_email}"]
-  }
+  sa_act_as = {}
 
-  depends_on = [module.services, module.runtime_sa]
+  depends_on = [module.services]
 }
 
 # Secrets (if using Mailgun or other secrets)
@@ -166,4 +164,22 @@ resource "google_cloud_run_v2_service_iam_member" "trigger_invoker" {
   member   = "serviceAccount:${local.compute_default_sa}"
   
   depends_on = [module.function]
+}
+
+# Grant runtime SA logging permissions
+resource "google_project_iam_member" "runtime_sa_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${module.runtime_sa.email}"
+  
+  depends_on = [module.runtime_sa]
+}
+
+# Allow deployer SA to act as runtime SA
+resource "google_service_account_iam_member" "deployer_act_as_runtime" {
+  service_account_id = module.runtime_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.deployer_sa_email}"
+  
+  depends_on = [module.runtime_sa]
 }
