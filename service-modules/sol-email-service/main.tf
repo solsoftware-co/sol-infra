@@ -87,21 +87,22 @@ module "iam" {
   depends_on = [module.services]
 }
 
-# Secrets (if using Mailgun or other secrets)
+# Mailgun API Key Secret
+# Uses secrets module with placeholder value - update manually in GCP after first apply
 module "secrets" {
   source     = "../../modules/secrets"
   project_id = var.project_id
 
-  secrets = var.mailgun_api_key != "" ? {
+  secrets = {
     "mailgun_api_key${var.environment == "prod" ? "" : "_${var.environment}"}" = {
-      secret_data = var.mailgun_api_key
+      secret_data = "PLACEHOLDER_UPDATE_IN_GCP"
       labels      = local.labels
     }
-  } : {}
+  }
 
-  secret_accessors = var.mailgun_api_key != "" ? {
+  secret_accessors = {
     "mailgun_api_key${var.environment == "prod" ? "" : "_${var.environment}"}" = [module.runtime_sa.email]
-  } : {}
+  }
 
   depends_on = [module.services, module.runtime_sa]
 }
@@ -140,12 +141,12 @@ module "function" {
     var.env_vars
   )
 
-  secret_env_vars = var.mailgun_api_key != "" ? {
+  secret_env_vars = {
     MAILGUN_API_KEY = {
       secret  = "mailgun_api_key${var.environment == "prod" ? "" : "_${var.environment}"}"
       version = "latest"
     }
-  } : {}
+  }
 
   depends_on = [
     module.services,
